@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- Pinch-zoom is left enabled (no maximum-scale / user-scalable=no) for accessibility. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bachon Ka Magic Whiteboard — ABC Learn</title>
+<meta name="description" content="Kids' magic whiteboard with on-draw ABC letter recognition and voice. Runs fully in the browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#FFF9C4; --bg2:#E1F5FE; --bg3:#F3E8FF;
+    --ink:#111; --muted:#5B5B5B; --line:rgba(0,0,0,.08);
+    --card:#ffffff; --radius:22px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;font-family:"Fredoka","Nunito",system-ui,sans-serif;color:var(--ink);}
+  body{
+    background: radial-gradient(1200px 600px at 20% 0%, var(--bg1) 0%, var(--bg1) 20%, var(--bg2) 70%, var(--bg3) 100%);
+    min-height:100vh; overflow-x:hidden;
+  }
+  .app{display:flex;flex-direction:column;min-height:100vh;}
+
+  /* Top banner */
+  .top-banner{display:flex;justify-content:center;padding:12px 12px 6px;}
+  .top-banner .pill{
+    background:rgba(255,255,255,.92); backdrop-filter:blur(8px);
+    padding:8px 18px; border-radius:999px; font-weight:800; font-size:14px; color:var(--muted);
+    box-shadow:0 8px 24px rgba(0,0,0,.08); display:flex;gap:8px;align-items:center;
+  }
+  .top-banner .pill b{color:#111}
+  .top-banner .tag{background:#FFD93D;padding:2px 8px;border-radius:999px;font-size:11px;color:#111}
+
+  /* Toolbar */
+  .toolbar-wrap{display:flex;justify-content:center;padding:6px 8px;}
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.9);backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.7);border-radius:20px;
+    padding:8px;max-width:1100px;box-shadow:0 12px 32px rgba(0,0,0,.1);
+  }
+  .tool{
+    min-width:56px;height:52px;padding:0 10px;border-radius:14px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font-weight:800;font-size:11px;color:#333;background:#fff;border:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(0,0,0,.04);cursor:pointer;transition:transform .12s,background .12s;
+  }
+  .tool:hover{transform:translateY(-1px) scale(1.03);}
+  .tool:active{transform:scale(.96);}
+  .tool.active{background:#111;color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.25);transform:scale(1.04);}
+  .tool .ico{font-size:20px;line-height:1;}
+  .divider{width:1px;height:36px;background:var(--line);margin:0 4px;}
+  .size-box{display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:0 10px;height:52px;border:1px solid var(--line);}
+  .size-box label{font-size:11px;font-weight:800;color:#555;}
+  .size-box input[type=range]{width:80px;accent-color:#111;}
+  .dot{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.15);}
+  .voice-select{
+    height:52px;border-radius:14px;padding:0 10px;font-weight:800;font-size:11px;
+    background:#fff;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .voice-select .voice-label{font-size:10px;color:#666;}
+  .voice-select select{border:none;background:transparent;font-weight:800;font-size:11px;color:#111;text-align:center;outline:none;}
+  .toggle{
+    height:52px;padding:0 12px;border-radius:14px;font-weight:800;font-size:11px;
+    border:1px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  }
+  .toggle.on{background:#D1FAE5;border-color:#6EE7B7;}
+  .toggle .ico{font-size:18px;}
+
+  /* Focus visibility for keyboard users */
+  button:focus-visible, select:focus-visible, input:focus-visible{
+    outline:3px solid #2563EB; outline-offset:2px;
+  }
+
+  /* Main layout */
+  .main{
+    flex:1;width:100%;max-width:1600px;margin:0 auto;
+    display:flex;gap:12px;padding:12px;align-items:stretch;
+  }
+  @media (max-width:900px){
+    .main{flex-direction:column;}
+  }
+
+  /* Color panel */
+  .color-panel{
+    background:rgba(255,255,255,.85);backdrop-filter:blur(10px);
+    border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);border:1px solid rgba(255,255,255,.6);
+    width:86px;align-items:center;flex-shrink:0;height:fit-content;
+  }
+  @media (max-width:900px){
+    .color-panel{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;}
+    .color-panel .label{display:none;}
+  }
+  .color-panel .label{font-size:11px;font-weight:800;color:#666;letter-spacing:.5px;}
+  .swatch{
+    width:42px;height:42px;border-radius:50%;border:3px solid #fff;cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,.1);transition:transform .12s;
+  }
+  .swatch:hover{transform:scale(1.06);}
+  .swatch.sel{transform:scale(1.1);border-color:#111;box-shadow:0 0 0 3px #fff,0 0 0 5px #111;}
+  .clear-btn{
+    width:100%;height:38px;border-radius:999px;background:#FFE4E6;border:1px solid #FFA1AD;
+    font-weight:800;font-size:12px;color:#9F1239;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;
+  }
+
+  /* Canvas */
+  .canvas-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0;}
+  .canvas-frame{
+    position:relative;width:100%;max-width:900px;
+    height:60vh;min-height:340px;
+    background:#fff;border-radius:26px;border:8px solid #fff;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.12),0 0 0 1px rgba(0,0,0,.04);
+    touch-action:none;
+  }
+  canvas#pad{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;display:block;}
+
+  /* Recognized letter overlay */
+  .letter-overlay{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    pointer-events:none;display:none;flex-direction:column;align-items:center;gap:4px;
+    animation:pop .9s cubic-bezier(.34,1.56,.64,1);
+  }
+  .letter-overlay.show{display:flex;}
+  .letter-overlay .big{
+    font-size:120px;font-weight:900;line-height:1;
+    -webkit-text-stroke:6px #fff;text-shadow:0 8px 20px rgba(0,0,0,.15);
+  }
+  .letter-overlay .word{
+    background:#fff;padding:4px 14px;border-radius:999px;font-weight:800;font-size:18px;
+    box-shadow:0 4px 12px rgba(0,0,0,.12);
+  }
+  @keyframes pop{
+    0%{transform:translate(-50%,-50%) scale(.4);opacity:0;}
+    40%{transform:translate(-50%,-50%) scale(1.15);opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(1);opacity:1;}
+  }
+
+  /* Action buttons */
+  .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  .btn{
+    height:52px;padding:0 22px;border-radius:999px;font-weight:800;font-size:14px;
+    display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:none;transition:transform .12s;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:#111;color:#fff;box-shadow:0 10px 24px rgba(0,0,0,.25);}
+  .btn-ghost{background:#fff;color:#111;border:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.05);}
+  .btn-danger{background:#FFF1F2;color:#9F1239;border:1px solid #FFB3BF;}
+
+  /* Alphabet panel */
+  .alpha-panel{
+    width:220px;flex-shrink:0;
+    background:rgba(255,255,255,.9);backdrop-filter:blur(10px);
+    border-radius:20px;border:1px solid rgba(255,255,255,.6);
+    box-shadow:0 12px 32px rgba(0,0,0,.08);
+    overflow:hidden;height:fit-content;
+  }
+  @media (max-width:900px){ .alpha-panel{width:100%;} }
+  .alpha-head{
+    width:100%;height:52px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 14px;font-weight:800;font-size:15px;background:none;border:none;cursor:pointer;
+  }
+  .alpha-body{padding:10px;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .alpha-body.hidden{display:none;}
+  .abc{
+    aspect-ratio:1/1;border-radius:12px;font-weight:900;font-size:16px;color:#111;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:3px solid rgba(255,255,255,.5);cursor:pointer;
+    transition:transform .12s;line-height:1;padding:2px;
+  }
+  .abc:hover{transform:scale(1.1);}
+  .abc:active{transform:scale(.95);}
+  .abc small{font-size:8px;font-weight:800;opacity:.9;margin-top:2px;}
+  .tip{margin-top:8px;background:#F8FAFF;border-radius:12px;padding:8px;font-size:11px;font-weight:700;color:#666;line-height:1.3;}
+  .tip b{color:#111;}
+
+  /* Modal */
+  .modal{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);
+    display:none;align-items:center;justify-content:center;padding:16px;z-index:100;
+  }
+  .modal.show{display:flex;}
+  .modal-card{
+    position:relative;background:#fff;border-radius:28px;padding:24px;max-width:520px;width:100%;
+    box-shadow:0 24px 80px rgba(0,0,0,.3);overflow:hidden;text-align:center;
+  }
+  .modal-card h2{margin:14px 0 4px;font-size:26px;font-weight:900;}
+  .modal-card p{margin:0;color:#666;font-weight:700;font-size:13px;}
+  .modal-card img{width:100%;border-radius:14px;background:#fff;margin-top:14px;border:1px solid var(--line);}
+  .modal-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .modal-actions .btn{flex:1;min-width:140px;justify-content:center;height:50px;font-size:13px;}
+  .tick{
+    width:80px;height:80px;border-radius:50%;background:#DCFCE7;border:4px solid #86EFAC;
+    display:inline-grid;place-items:center;font-size:44px;font-weight:900;color:#16A34A;
+    animation:pop2 .6s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop2{0%{transform:scale(0) rotate(-20deg);}60%{transform:scale(1.3) rotate(10deg);}100%{transform:scale(1) rotate(0);}}
+
+  /* Confetti */
+  .confetti{position:absolute;width:10px;height:10px;border-radius:50%;top:-20px;animation:fall 1.6s linear infinite;}
+  @keyframes fall{0%{transform:translateY(-20vh) rotate(0);}100%{transform:translateY(110vh) rotate(720deg) translateX(50px);}}
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top-banner">
+    <div class="pill">
+      <span aria-hidden="true">✨</span>
+      <span>Ungli se likho — Magic Pen professional bana dega, phir ABC voice sunayega!</span>
+      <span class="tag" id="learnTag">ABC Learn: ON</span>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar-wrap">
+    <div class="toolbar" role="toolbar" aria-label="Drawing tools">
+      <button class="tool" data-mode="pencil" aria-pressed="false"><span class="ico" aria-hidden="true">✏️</span><span>Pencil</span></button>
+      <button class="tool active" data-mode="magic" aria-pressed="true"><span class="ico" aria-hidden="true">✨</span><span>Magic</span></button>
+      <button class="tool" data-mode="eraser" aria-pressed="false"><span class="ico" aria-hidden="true">🧽</span><span>Eraser</span></button>
+      <button class="tool" data-mode="fill" aria-pressed="false"><span class="ico" aria-hidden="true">🪣</span><span>Fill</span></button>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <button class="tool" id="undoBtn"><span class="ico" aria-hidden="true">↩️</span><span>Undo</span></button>
+
+      <div class="size-box">
+        <label for="sizeRange">Motai</label>
+        <input type="range" id="sizeRange" min="2" max="20" value="6" />
+        <div class="dot" id="sizeDot" style="background:#FF3B30;" aria-hidden="true"></div>
+      </div>
+
+      <div class="voice-select">
+        <label class="voice-label" for="voiceStyle">VOICE</label>
+        <select id="voiceStyle">
+          <option value="professional">👨‍🏫 Professional</option>
+          <option value="baby">👶 Baby</option>
+        </select>
+      </div>
+
+      <button class="toggle on" id="voiceToggle" aria-pressed="true"><span class="ico" aria-hidden="true">🔊</span><span>Voice ON</span></button>
+      <button class="toggle on" id="learnToggle" aria-pressed="true"><span class="ico" aria-hidden="true">🔤</span><span>ABC Learn</span></button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Colors -->
+    <aside class="color-panel" aria-label="Colors">
+      <div class="label" aria-hidden="true">RANG</div>
+      <div id="swatchList" role="group" aria-label="Colors" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <button class="clear-btn" id="clearBtn"><span aria-hidden="true">🗑️</span> Saaf</button>
+    </aside>
+
+    <!-- Canvas -->
+    <div class="canvas-wrap">
+      <div class="canvas-frame">
+        <canvas id="pad" role="img" aria-label="Drawing canvas for kids"></canvas>
+        <div class="letter-overlay" id="letterOverlay">
+          <div class="big" id="letterBig">A</div>
+          <div class="word" id="letterWord">A for Apple</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="finalBtn">Final Dekho <span aria-hidden="true" style="background:#34C759;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;">✓</span></button>
+        <button class="btn btn-ghost" id="saveBtn"><span aria-hidden="true">💾</span> Save Image</button>
+        <button class="btn btn-danger" id="clearBtn2"><span aria-hidden="true">🗑️</span> Clear</button>
+      </div>
+    </div>
+
+    <!-- Alphabet -->
+    <aside class="alpha-panel" aria-label="Alphabet">
+      <button class="alpha-head" id="alphaHead" aria-expanded="true" aria-controls="alphaBody">
+        <span><span aria-hidden="true">🔤</span> Alphabet Magic</span>
+        <span id="alphaArrow" aria-hidden="true" style="transition:transform .2s;">▼</span>
+      </button>
+      <div class="alpha-body" id="alphaBody">
+        <!-- populated by JS -->
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal" id="modal">
+  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
+    <div id="modalConfetti" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;"></div>
+    <div class="tick" aria-hidden="true">✓</div>
+    <h2 id="modalTitle">Wah! Zabardast! 🎉</h2>
+    <p id="modalDesc">Tumhari drawing final ho gayi!</p>
+    <img id="modalImg" alt="Your final drawing" />
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="modalSave"><span aria-hidden="true">💾</span> Save as Image</button>
+      <button class="btn btn-ghost" id="modalClose">Wapis Edit Karo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   BACHON KA MAGIC WHITEBOARD — vanilla JS
+   Features:
+   - Magic pen (shape snapping), Pencil, Eraser, Fill, Undo
+   - 12 colors, brush size, save, clear
+   - Alphabet side panel (tap → speaks letter + word)
+   - On-draw letter recognition → speaks automatically in
+     "Professional" or "Baby" voice (toggle in toolbar)
+   ================================================================ */
+
+const COLORS = ["#FF3B30","#FF9500","#FFCC00","#34C759","#007AFF","#5856D6",
+                "#AF52DE","#FF2D55","#00C7BE","#000000","#8E8E93","#FFFFFF"];
+const LETTER_WORDS = {
+  A:"Apple",B:"Ball",C:"Cat",D:"Dog",E:"Elephant",F:"Fish",G:"Grapes",H:"House",
+  I:"Ice Cream",J:"Jug",K:"Kite",L:"Lion",M:"Mango",N:"Nest",O:"Orange",P:"Parrot",
+  Q:"Queen",R:"Rabbit",S:"Sun",T:"Tiger",U:"Umbrella",V:"Van",W:"Watch",
+  X:"Xylophone",Y:"Yak",Z:"Zebra"
+};
+const ALPHA_COLORS = ["#FF6B6B","#4ECDC4","#FFD93D","#6BCB77","#A78BFA","#F97316","#38BDF8","#FB7185"];
+
+/* ---------- STATE ---------- */
+const S = {
+  mode: "magic",
+  color: "#FF3B30",
+  size: 6,
+  voiceOn: true,
+  voiceStyle: "professional",
+  learnOn: true,
+  isDrawing: false,
+  currentStroke: [],
+  strokes: [],       // all strokes since last clear (for recognition)
+  undoStack: [],     // ImageData snapshots
+  lastSpoken: { letter: null, time: 0 }
+};
+
+/* ---------- DOM ---------- */
+const $ = (id) => document.getElementById(id);
+const canvas = $("pad");
+const ctx = canvas.getContext("2d");
+const overlay = $("letterOverlay");
+
+/* ---------- CANVAS SETUP / RESIZE ---------- */
+function resizeCanvas(preserve = true) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  let snapshot = null;
+  if (preserve && canvas.width > 0) {
+    snapshot = document.createElement("canvas");
+    snapshot.width = canvas.width;
+    snapshot.height = canvas.height;
+    snapshot.getContext("2d").drawImage(canvas, 0, 0);
+  }
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  if (snapshot) {
+    ctx.drawImage(snapshot, 0, 0, snapshot.width / dpr, snapshot.height / dpr);
+  }
+  saveUndoSnapshot();
+}
+
+/* ---------- UNDO ---------- */
+function saveUndoSnapshot() {
+  try {
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    S.undoStack.push(img);
+    if (S.undoStack.length > 30) S.undoStack.shift();
+  } catch (e) { /* ignore */ }
+}
+function undo() {
+  if (S.undoStack.length < 2) return;
+  S.undoStack.pop();                      // current
+  const prev = S.undoStack[S.undoStack.length - 1];
+  ctx.putImageData(prev, 0, 0);
+  // clear recently drawn strokes tracking
+  S.strokes = [];
+}
+
+/* ---------- POINTER HANDLING ---------- */
+function getPt(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function startStroke(e) {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  S.isDrawing = true;
+  S.currentStroke = [getPt(e)];
+  saveUndoSnapshot();
+
+  ctx.strokeStyle = S.mode === "eraser" ? "#ffffff" : S.color;
+  ctx.lineWidth = S.mode === "eraser" ? S.size * 2.2 : S.size;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(S.currentStroke[0].x, S.currentStroke[0].y);
+
+  if (S.mode === "fill") {
+    floodFill(Math.floor(S.currentStroke[0].x), Math.floor(S.currentStroke[0].y), S.color);
+    S.isDrawing = false;
+    S.currentStroke = [];
+  }
+}
+function moveStroke(e) {
+  if (!S.isDrawing || S.mode === "fill") return;
+  e.preventDefault();
+  const pt = getPt(e);
+  S.currentStroke.push(pt);
+  if (S.mode === "pencil" || S.mode === "magic" || S.mode === "eraser") {
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  }
+}
+function endStroke(e) {
+  if (!S.isDrawing) return;
+  S.isDrawing = false;
+  const stroke = S.currentStroke;
+  S.currentStroke = [];
+  if (stroke.length < 2) return;
+
+  // Keep raw stroke for recognition
+  S.strokes.push(stroke);
+
+  // MAGIC MODE: redraw as snapped shape
+  if (S.mode === "magic" && S.undoStack.length >= 2) {
+    // restore previous snapshot (undo current raw stroke)
+    const prev = S.undoStack[S.undoStack.length - 2];
+    ctx.putImageData(prev, 0, 0);
+    drawMagicShape(stroke);
+  }
+
+  // PENCIL: smooth redraw
+  if (S.mode === "pencil" && S.undoStack.length >= 2) {
+    const prev = S.undoStack[S.undoStack.length - 2];
+    ctx.putImageData(prev, 0, 0);
+    drawSmoothStroke(stroke);
+  }
+
+  // Try letter recognition after stroke finishes
+  if (S.learnOn) {
+    setTimeout(() => tryRecognizeLetters(), 60);
+  }
+}
+
+canvas.addEventListener("pointerdown", startStroke);
+canvas.addEventListener("pointermove", moveStroke);
+canvas.addEventListener("pointerup", endStroke);
+canvas.addEventListener("pointercancel", endStroke);
+
+/* ---------- DRAWING HELPERS ---------- */
+function drawSmoothStroke(points) {
+  if (points.length < 2) return;
+  ctx.strokeStyle = S.color;
+  ctx.lineWidth = S.size;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length - 1; i++) {
+    const cx = (points[i].x + points[i + 1].x) / 2;
+    const cy = (points[i].y + points[i + 1].y) / 2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, cx, cy);
+  }
+  const last = points[points.length - 1];
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
+}
+
+/* ---------- SHAPE SNAP (Magic) ---------- */
+function bbox(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  points.forEach(p => {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  });
+  return { minX, minY, maxX, maxY,
+    width: maxX - minX, height: maxY - minY,
+    cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+function drawMagicShape(points) {
+  const bb = bbox(points);
+  ctx.strokeStyle = S.color;
+  ctx.lineWidth = S.size;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+
+  const start = points[0], end = points[points.length - 1];
+  const isClosed = Math.hypot(start.x - end.x, start.y - end.y) < Math.max(30, Math.hypot(bb.width, bb.height) * 0.25);
+  const aspect = bb.width / Math.max(bb.height, 1);
+
+  if (isClosed) {
+    if (aspect > 0.85 && aspect < 1.18) {
+      // circle / oval
+      ctx.ellipse(bb.cx, bb.cy, bb.width / 2, bb.height / 2, 0, 0, Math.PI * 2);
+    } else if (aspect > 1.4) {
+      // ellipse horizontal
+      ctx.ellipse(bb.cx, bb.cy, bb.width / 2, bb.height / 2, 0, 0, Math.PI * 2);
+    } else if (aspect < 0.7) {
+      // ellipse vertical
+      ctx.ellipse(bb.cx, bb.cy, bb.width / 2, bb.height / 2, 0, 0, Math.PI * 2);
+    } else {
+      // rounded rect
+      const r = Math.min(12, bb.width / 6, bb.height / 6);
+      roundRect(ctx, bb.minX, bb.minY, bb.width, bb.height, r);
+    }
+  } else {
+    // straight-ish → line
+    const dx = end.x - start.x, dy = end.y - start.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 20) {
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+    } else {
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+    }
+  }
+  ctx.stroke();
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.moveTo(x + r, y);
+  c.lineTo(x + w - r, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r);
+  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  c.lineTo(x + r, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - r);
+  c.lineTo(x, y + r);
+  c.quadraticCurveTo(x, y, x + r, y);
+}
+
+/* ---------- FLOOD FILL ---------- */
+function hexToRgb(hex) {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16)
+  };
+}
+function floodFill(x, y, hexColor) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width, h = canvas.height;
+  const px = Math.floor(x * dpr), py = Math.floor(y * dpr);
+  if (px < 0 || py < 0 || px >= w || py >= h) return;
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const targetIdx = (py * w + px) * 4;
+  const tR = data[targetIdx], tG = data[targetIdx + 1], tB = data[targetIdx + 2], tA = data[targetIdx + 3];
+
+  const { r, g, b } = hexToRgb(hexColor);
+  if (tR === r && tG === g && tB === b) return;
+
+  const tolerance = 32;
+  const match = (i) =>
+    Math.abs(data[i] - tR) <= tolerance &&
+    Math.abs(data[i + 1] - tG) <= tolerance &&
+    Math.abs(data[i + 2] - tB) <= tolerance &&
+    Math.abs(data[i + 3] - tA) <= tolerance;
+
+  const visited = new Uint8Array(w * h);
+  const stack = [[px, py]];
+  const maxPixels = w * h * 0.6;
+  let count = 0;
+
+  while (stack.length && count < maxPixels) {
+    const [cx, cy] = stack.pop();
+    const idx = cy * w + cx;
+    if (visited[idx]) { count++; continue; }
+    visited[idx] = 1;
+    const di = idx * 4;
+    if (!match(di)) { count++; continue; }
+    data[di] = r; data[di + 1] = g; data[di + 2] = b; data[di + 3] = 255;
+    if (cx > 0) stack.push([cx - 1, cy]);
+    if (cx < w - 1) stack.push([cx + 1, cy]);
+    if (cy > 0) stack.push([cx, cy - 1]);
+    if (cy < h - 1) stack.push([cx, cy + 1]);
+    count++;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+/* ================================================================
+   LETTER RECOGNITION
+   ================================================================ */
+
+const TEMPLATE_SIZE = 64;
+const letterTemplates = {};   // letter -> canvas
+
+function buildLetterTemplates() {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (const L of letters) {
+    const c = document.createElement("canvas");
+    c.width = TEMPLATE_SIZE;
+    c.height = TEMPLATE_SIZE;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, TEMPLATE_SIZE, TEMPLATE_SIZE);
+    g.fillStyle = "#000";
+    g.font = `bold ${TEMPLATE_SIZE * 0.72}px "Fredoka","Arial Black",Arial,sans-serif`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(L, TEMPLATE_SIZE / 2, TEMPLATE_SIZE / 2 + 2);
+    letterTemplates[L] = c;
+  }
+}
+
+function renderStrokesToTemplate(strokes, size) {
+  const all = [];
+  strokes.forEach(s => s.forEach(p => all.push(p)));
+  if (all.length < 3) return null;
+
+  const bb = bbox(all);
+  if (bb.width < 12 || bb.height < 12) return null;
+
+  const scale = (size * 0.78) / Math.max(bb.width, bb.height);
+  const cx = bb.cx, cy = bb.cy;
+
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, size, size);
+  g.strokeStyle = "#000";
+  g.lineWidth = Math.max(4, size * 0.09);
+  g.lineCap = "round";
+  g.lineJoin = "round";
+
+  for (const stroke of strokes) {
+    if (stroke.length < 2) continue;
+    g.beginPath();
+    for (let i = 0; i < stroke.length; i++) {
+      const x = size / 2 + (stroke[i].x - cx) * scale;
+      const y = size / 2 + (stroke[i].y - cy) * scale;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  return c;
+}
+
+function binarize(canvasEl) {
+  const w = canvasEl.width, h = canvasEl.height;
+  const d = canvasEl.getContext("2d").getImageData(0, 0, w, h).data;
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const b = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+    out[i] = b < 128 ? 1 : 0;
+  }
+  return out;
+}
+
+function dilate(bin, w, h, r) {
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!bin[y * w + x]) continue;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < w && ny >= 0 && ny < h) out[ny * w + nx] = 1;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function similarityScore(drawnCanvas, templateCanvas) {
+  const w = TEMPLATE_SIZE, h = TEMPLATE_SIZE;
+  const A = binarize(drawnCanvas);
+  const B = binarize(templateCanvas);
+  const Ad = dilate(A, w, h, 3);
+  const Bd = dilate(B, w, h, 3);
+
+  let drawnCount = 0, drawnCovered = 0;
+  let tplCount = 0, tplCovered = 0;
+
+  for (let i = 0; i < w * h; i++) {
+    if (A[i]) { drawnCount++; if (Bd[i]) drawnCovered++; }
+    if (B[i]) { tplCount++; if (Ad[i]) tplCovered++; }
+  }
+  const coverage = drawnCount ? drawnCovered / drawnCount : 0;
+  const precision = tplCount ? tplCovered / tplCount : 0;
+  return (coverage + precision) > 0 ? (2 * coverage * precision) / (coverage + precision) : 0;
+}
+
+function recognizeLetter(strokes) {
+  const drawn = renderStrokesToTemplate(strokes, TEMPLATE_SIZE);
+  if (!drawn) return null;
+
+  const scores = [];
+  for (const L in letterTemplates) {
+    scores.push({ letter: L, score: similarityScore(drawn, letterTemplates[L]) });
+  }
+  scores.sort((a, b) => b.score - a.score);
+
+  const best = scores[0], second = scores[1];
+  if (best.score < 0.5) return null;               // too low
+  if (best.score - second.score < 0.04) return null; // too close to call
+  return { letter: best.letter, confidence: best.score };
+}
+
+function tryRecognizeLetters() {
+  if (!S.learnOn || S.strokes.length === 0) return;
+  // only try if total strokes count is small (letters are 1-4 strokes)
+  if (S.strokes.length > 4) {
+    // Reset accumulation when drawings get complex
+    return;
+  }
+  const result = recognizeLetter(S.strokes);
+  if (!result) return;
+
+  const now = Date.now();
+  // Don't repeat the same letter too fast
+  if (S.lastSpoken.letter === result.letter && now - S.lastSpoken.time < 4000) return;
+
+  S.lastSpoken = { letter: result.letter, time: now };
+  speakLetter(result.letter);
+  showLetterOverlay(result.letter);
+}
+
+function showLetterOverlay(letter) {
+  $("letterBig").textContent = letter;
+  $("letterBig").style.color = S.color;
+  $("letterWord").textContent = `${letter} for ${LETTER_WORDS[letter]}`;
+  overlay.classList.remove("show");
+  // force reflow for re-animation
+  void overlay.offsetWidth;
+  overlay.classList.add("show");
+  clearTimeout(showLetterOverlay._t);
+  showLetterOverlay._t = setTimeout(() => overlay.classList.remove("show"), 1800);
+}
+
+/* ================================================================
+   VOICE
+   ================================================================ */
+
+let cachedVoice = null;
+function pickVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  // Prefer Google / Microsoft natural voices
+  const prefs = [
+    /Google.*(Female|US English)/i,
+    /Samantha/i,
+    /Microsoft.*(Aria|Jenny|Zira)/i,
+    /English.*Female/i
+  ];
+  for (const re of prefs) {
+    const v = voices.find(v => re.test(v.name));
+    if (v) return v;
+  }
+  return voices.find(v => v.lang && v.lang.startsWith("en")) || voices[0];
+}
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => { cachedVoice = pickVoice(); };
+  cachedVoice = pickVoice();
+}
+
+function speak(text, opts = {}) {
+  if (!S.voiceOn || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (cachedVoice || !cachedVoice) cachedVoice = pickVoice();
+    if (cachedVoice) u.voice = cachedVoice;
+
+    if (S.voiceStyle === "baby") {
+      u.pitch = 1.6;
+      u.rate = 0.8;
+    } else { // professional
+      u.pitch = 1.0;
+      u.rate = 0.95;
+    }
+    u.volume = 1;
+    window.speechSynthesis.speak(u);
+  } catch (err) { /* ignore */ }
+}
+
+function speakLetter(letter) {
+  const word = LETTER_WORDS[letter];
+  // Good pacing: "A. A for Apple."
+  speak(`${letter}. ${letter} for ${word}.`, { letter });
+}
+
+/* ================================================================
+   ALPHABET PANEL
+   ================================================================ */
+
+function buildAlphabetPanel() {
+  const body = $("alphaBody");
+  body.innerHTML = "";
+  const letters = Object.keys(LETTER_WORDS);
+  letters.forEach((L, i) => {
+    const btn = document.createElement("button");
+    btn.className = "abc";
+    btn.style.background = ALPHA_COLORS[i % ALPHA_COLORS.length];
+    btn.dataset.letter = L;
+    btn.setAttribute("aria-label", `${L} for ${LETTER_WORDS[L]}`);
+    btn.innerHTML = `${L}<small aria-hidden="true">${LETTER_WORDS[L].slice(0, 4)}</small>`;
+    btn.addEventListener("click", () => {
+      speakLetter(L);
+      showLetterOverlay(L);
+      // draw the letter subtly on the canvas
+      stampLetterOnCanvas(L);
+    });
+    body.appendChild(btn);
+  });
+}
+
+function stampLetterOnCanvas(L) {
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.width / 2 + (Math.random() - 0.5) * 120;
+  const cy = rect.height / 2 + (Math.random() - 0.5) * 100;
+  const size = Math.min(140, Math.max(90, rect.width * 0.16));
+  saveUndoSnapshot();
+  ctx.save();
+  ctx.font = `900 ${size}px "Fredoka","Nunito",sans-serif`;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#111";
+  ctx.lineJoin = "round";
+  ctx.strokeText(L, cx - size * 0.32, cy + size * 0.32);
+  ctx.restore();
+}
+
+/* ================================================================
+   UI WIRING
+   ================================================================ */
+
+function buildColorSwatches() {
+  const list = $("swatchList");
+  list.innerHTML = "";
+  COLORS.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "swatch" + (c === S.color ? " sel" : "");
+    b.style.background = c;
+    b.setAttribute("aria-label", `Select color ${c}`);
+    b.setAttribute("aria-pressed", c === S.color ? "true" : "false");
+    if (c === "#FFFFFF") b.innerHTML = `<span aria-hidden="true" style="display:grid;place-items:center;width:100%;height:100%;font-size:14px;">⚪</span>`;
+    b.addEventListener("click", () => {
+      S.color = c;
+      document.querySelectorAll(".swatch").forEach(x => {
+        x.classList.remove("sel");
+        x.setAttribute("aria-pressed", "false");
+      });
+      b.classList.add("sel");
+      b.setAttribute("aria-pressed", "true");
+      $("sizeDot").style.background = c;
+    });
+    list.appendChild(b);
+  });
+}
+
+document.querySelectorAll(".tool[data-mode]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    S.mode = btn.dataset.mode;
+    document.querySelectorAll(".tool[data-mode]").forEach(b => {
+      b.classList.remove("active");
+      b.setAttribute("aria-pressed", "false");
+    });
+    btn.classList.add("active");
+    btn.setAttribute("aria-pressed", "true");
+  });
+});
+
+$("undoBtn").addEventListener("click", undo);
+$("sizeRange").addEventListener("input", (e) => {
+  S.size = parseInt(e.target.value);
+  const d = $("sizeDot");
+  d.style.width = (S.size + 8) + "px";
+  d.style.height = (S.size + 8) + "px";
+});
+
+$("voiceStyle").addEventListener("change", (e) => {
+  S.voiceStyle = e.target.value;
+  speak("Hello!", {});
+});
+
+$("voiceToggle").addEventListener("click", (e) => {
+  S.voiceOn = !S.voiceOn;
+  const el = e.currentTarget;
+  el.classList.toggle("on", S.voiceOn);
+  el.setAttribute("aria-pressed", S.voiceOn ? "true" : "false");
+  el.querySelector("span:last-child").textContent = S.voiceOn ? "Voice ON" : "Voice OFF";
+  el.querySelector(".ico").textContent = S.voiceOn ? "🔊" : "🔇";
+});
+
+$("learnToggle").addEventListener("click", (e) => {
+  S.learnOn = !S.learnOn;
+  const el = e.currentTarget;
+  el.classList.toggle("on", S.learnOn);
+  el.setAttribute("aria-pressed", S.learnOn ? "true" : "false");
+  $("learnTag").textContent = `ABC Learn: ${S.learnOn ? "ON" : "OFF"}`;
+});
+
+function clearCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  S.strokes = [];
+  S.undoStack = [];
+  saveUndoSnapshot();
+  overlay.classList.remove("show");
+}
+$("clearBtn").addEventListener("click", clearCanvas);
+$("clearBtn2").addEventListener("click", clearCanvas);
+
+$("alphaHead").addEventListener("click", () => {
+  const body = $("alphaBody");
+  const isHidden = body.classList.toggle("hidden");
+  $("alphaHead").setAttribute("aria-expanded", isHidden ? "false" : "true");
+  $("alphaArrow").style.transform = isHidden ? "rotate(0)" : "rotate(180deg)";
+});
+
+/* ---------- SAVE / FINAL ---------- */
+function saveImage() {
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "meri-drawing.png";
+  a.click();
+}
+$("saveBtn").addEventListener("click", saveImage);
+$("modalSave").addEventListener("click", saveImage);
+
+function openModal() {
+  $("modal").classList.add("show");
+  $("modalClose").focus();
+}
+function closeModal() {
+  $("modal").classList.remove("show");
+}
+
+$("finalBtn").addEventListener("click", () => {
+  $("modalImg").src = canvas.toDataURL("image/png");
+  openModal();
+  // Confetti
+  const conf = $("modalConfetti");
+  conf.innerHTML = "";
+  for (let i = 0; i < 36; i++) {
+    const d = document.createElement("div");
+    d.className = "confetti";
+    d.style.left = (Math.random() * 100) + "%";
+    d.style.background = ALPHA_COLORS[i % ALPHA_COLORS.length];
+    d.style.animationDuration = (1.2 + Math.random() * 1.4) + "s";
+    d.style.animationDelay = (Math.random() * 0.8) + "s";
+    conf.appendChild(d);
+  }
+});
+$("modalClose").addEventListener("click", closeModal);
+$("modal").addEventListener("click", (e) => {
+  if (e.target === $("modal")) closeModal();
+});
+// Escape closes the dialog (keyboard accessibility)
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("modal").classList.contains("show")) closeModal();
+});
+
+/* ================================================================
+   INIT
+   ================================================================ */
+
+(function init() {
+  // Resize observer for the canvas
+  resizeCanvas(false);
+  const ro = new ResizeObserver(() => resizeCanvas(true));
+  ro.observe(canvas.parentElement);
+
+  buildColorSwatches();
+  buildAlphabetPanel();
+  buildLetterTemplates();
+
+  // Prime speech voices
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.getVoices();
+    setTimeout(() => { cachedVoice = pickVoice(); }, 300);
+  }
+
+  // Welcome voice after short delay (once)
+  setTimeout(() => {
+    if (S.voiceOn) speak("Welcome! Draw a letter, and I will say its name.");
+  }, 800);
+})();
+</script>
+</body>
+</html>
